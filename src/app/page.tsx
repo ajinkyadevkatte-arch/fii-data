@@ -79,16 +79,17 @@ export default function Home() {
     }
   };
 
-  const formatNumber = (numStr: string) => {
-    const num = parseFloat(numStr.replace(/,/g, ''));
-    if (isNaN(num)) return numStr;
+  const formatNumber = (numStr: string | undefined | null) => {
+    if (!numStr && numStr !== '0') return '0.00';
+    const num = parseFloat(String(numStr).replace(/,/g, ''));
+    if (isNaN(num)) return '0.00';
     return new Intl.NumberFormat('en-IN', {
       maximumFractionDigits: 2,
       minimumFractionDigits: 2
     }).format(num);
   };
 
-  const getNetVal = (item: NSEData) => parseFloat(item.netValue.replace(/,/g, ''));
+  const getNetVal = (item: NSEData) => parseFloat((item.netValue ?? '0').replace(/,/g, ''));
   const isPos = (item: NSEData) => getNetVal(item) >= 0;
 
   // Reusable social media row with real SVG logos
