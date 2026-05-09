@@ -36,13 +36,13 @@ async function fetchFromNSE() {
     }
   }
 
-  // Step 2: Warm up session by visiting the FII/DII page
+  // Step 2: Hit the FII/DII page to warm up session
   await fetch('https://www.nseindia.com/market-data/fii-dii-activity', {
     headers: { ...headers, Cookie: cookies },
     redirect: 'follow',
   });
 
-  // Step 3: Fetch the actual data
+  // Step 3: Fetch actual data
   const dataResponse = await fetch(dataUrl, {
     headers: { ...headers, Cookie: cookies },
   });
@@ -51,71 +51,45 @@ async function fetchFromNSE() {
     throw new Error(`NSE responded with ${dataResponse.status}`);
   }
 
-  return await dataResponse.json();
+  const data = await dataResponse.json();
+  return data;
 }
 
-export async function GET() {
-  const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+// Cron endpoint — called by Vercel daily at 4 PM IST
+export async function GET(request: Request) {
+  // Security: Only allow Vercel Cron calls
+  const authHeader = request.headers.get('authorization');
+  const cronSecret = process.env.CRON_SECRET;
 
-  // ── 1. Try Redis cache first (fastest, most reliable) ──
-  if (redisUrl && redisToken) {
-    try {
-      const redisRes = await fetch(`${redisUrl}/get/nse:fii_dii`, {
-        headers: { Authorization: `Bearer ${redisToken}` },
-      });
-      const redisData = await redisRes.json();
-
-      if (redisData.result) {
-        const parsed = JSON.parse(redisData.result);
-        console.log('[API] Serving from Redis cache.');
-        return NextResponse.json(parsed, {
-          headers: { 'x-data-source': 'redis-cache' },
-        });
-      }
-    } catch (err) {
-      console.warn('[API] Redis read failed, falling back to NSE live fetch.');
-    }
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return new Response('Unauthorized', { status: 401 });
   }
 
-  // ── 2. Try live fetch from NSE ──
   try {
+    console.log('[CRON] Starting NSE data refresh...');
     const data = await fetchFromNSE();
-    console.log('[API] Serving live NSE data.');
 
-    // Also save to Redis if available (so next request is instant)
+    // Store in Upstash Redis if configured
+    const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
     if (redisUrl && redisToken) {
-      fetch(`${redisUrl}/set/nse:fii_dii`, {
+      const payload = JSON.stringify(data);
+      // Store with 30-hour expiry (covers overnight + weekend buffer)
+      await fetch(`${redisUrl}/set/nse:fii_dii`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${redisToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify([JSON.stringify(data), 'EX', 108000]),
-      }).catch(() => {}); // fire and forget
+        body: JSON.stringify([payload, 'EX', 108000]), // 30 hours
+      });
+      console.log('[CRON] Data saved to Redis successfully.');
     }
 
-    return NextResponse.json(data, {
-      headers: { 'x-data-source': 'nse-live' },
-    });
+    return NextResponse.json({ success: true, records: data.length, timestamp: new Date().toISOString() });
   } catch (error: any) {
-    console.error('[API] NSE live fetch failed:', error.message);
+    console.error('[CRON] Failed:', error.message);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
-
-  // ── 3. Last resort: return fallback mock with today's date ──
-  const today = new Date();
-  const dd = today.getDate().toString().padStart(2, '0');
-  const mm = (today.getMonth() + 1).toString().padStart(2, '0');
-  const yyyy = today.getFullYear();
-  const dateStr = `${dd}-${mm}-${yyyy}`;
-
-  const mockData = [
-    { category: 'FII/FPI *', date: dateStr, buyValue: '0', sellValue: '0', netValue: '0' },
-    { category: 'DII **',    date: dateStr, buyValue: '0', sellValue: '0', netValue: '0' },
-  ];
-
-  return NextResponse.json(mockData, {
-    status: 200,
-    headers: { 'x-fallback-data': 'true', 'x-data-source': 'fallback' },
-  });
 }
