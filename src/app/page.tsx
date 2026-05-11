@@ -197,7 +197,7 @@ export default function Home() {
             <div key={item.category}>
               <h2 className="text-2xl font-bold border-b border-[#111] pb-2 mb-4 uppercase">{item.category} Activity</h2>
               <p className="text-sm text-[#444] mb-4 leading-relaxed font-sans">
-                Summary of total gross purchases and sales executed by {item.category.includes("FII") ? "Foreign" : "Domestic"} Institutional Investors during the trading session.
+                Summary of total gross purchases and sales executed by {(item.category || "").includes("FII") ? "Foreign" : "Domestic"} Institutional Investors during the trading session.
               </p>
               
               <div className="space-y-3 font-sans">
@@ -252,8 +252,8 @@ export default function Home() {
             <div key={item.category} className={`flex items-stretch gap-0 ${idx === 0 ? 'mb-5 pb-5 border-b border-[#e8e0d0]' : ''}`}>
               {/* Category label */}
               <div className="w-48 pr-6 flex flex-col justify-center">
-                <div className="text-2xl font-black text-[#0f3460]">{item.category.includes('FII') ? 'FII' : 'DII'}</div>
-                <div className="text-[10px] text-[#aaa] tracking-[0.2em] uppercase mt-0.5">{item.category.includes('FII') ? 'Foreign Inst.' : 'Domestic Inst.'}</div>
+                <div className="text-2xl font-black text-[#0f3460]">{(item.category || "").includes('FII') ? 'FII' : 'DII'}</div>
+                <div className="text-[10px] text-[#aaa] tracking-[0.2em] uppercase mt-0.5">{(item.category || "").includes('FII') ? 'Foreign Inst.' : 'Domestic Inst.'}</div>
               </div>
               {/* Divider */}
               <div className="w-px bg-[#e8e0d0] mx-2" />
@@ -320,8 +320,8 @@ export default function Home() {
             <div key={item.category} className={`p-8 ${idx === 0 ? 'border-r border-[#24273a]' : ''}`}>
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <div className="text-[10px] tracking-[0.2em] uppercase text-[#6c7086] mb-1">{item.category.includes('FII') ? 'Foreign Inst.' : 'Domestic Inst.'}</div>
-                  <h2 className="text-3xl font-black text-white">{item.category.includes('FII') ? 'FII' : 'DII'}</h2>
+                  <div className="text-[10px] tracking-[0.2em] uppercase text-[#6c7086] mb-1">{(item.category || "").includes('FII') ? 'Foreign Inst.' : 'Domestic Inst.'}</div>
+                  <h2 className="text-3xl font-black text-white">{(item.category || "").includes('FII') ? 'FII' : 'DII'}</h2>
                 </div>
                 <div className={`text-xs font-bold px-2.5 py-1 rounded ${
                   positive ? 'bg-[#a6e3a1]/15 text-[#a6e3a1]' : 'bg-[#f38ba8]/15 text-[#f38ba8]'

@@ -67,7 +67,23 @@ export async function GET(request: Request) {
 
   try {
     console.log('[CRON] Starting NSE data refresh...');
-    const data = await fetchFromNSE();
+    const rawData = await fetchFromNSE();
+
+    // Normalize field names
+    const rows: any[] = Array.isArray(rawData) ? rawData : (rawData?.data ?? []);
+    const normalized = rows.map((row: any) => ({
+      category:  row.category  ?? row.Category  ?? 'Unknown',
+      date:      row.date      ?? row.Date       ?? new Date().toLocaleDateString('en-IN'),
+      buyValue:  String(row.buyValue  ?? row.grossPurchase  ?? row.grossBuy  ?? row.buy  ?? '0'),
+      sellValue: String(row.sellValue ?? row.grossSale      ?? row.grossSell ?? row.sell ?? '0'),
+      netValue:  String(row.netValue  ?? row.netPurchaseSale ?? row.net      ?? '0'),
+    }));
+
+    // Filter for only FII and DII (remove TOTAL rows)
+    const data = normalized.filter(row => 
+      row.category.toUpperCase().includes('FII') || 
+      row.category.toUpperCase().includes('DII')
+    );
 
     // Store in Upstash Redis if configured
     const redisUrl = process.env.UPSTASH_REDIS_REST_URL;

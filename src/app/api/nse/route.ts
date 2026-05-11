@@ -57,7 +57,14 @@ async function fetchFromNSE() {
   }));
 
   if (normalized.length === 0) throw new Error('No data rows returned from NSE');
-  return normalized;
+  
+  // Filter for only FII and DII (remove TOTAL rows if present)
+  const filtered = normalized.filter(row => 
+    row.category.toUpperCase().includes('FII') || 
+    row.category.toUpperCase().includes('DII')
+  );
+
+  return filtered.length > 0 ? filtered : normalized;
 }
 
 export async function GET() {
@@ -74,7 +81,23 @@ export async function GET() {
       if (redisData.result) {
         const parsed = JSON.parse(redisData.result);
         console.log('[API] Serving from Redis cache.');
-        return NextResponse.json(parsed, { headers: { 'x-data-source': 'redis-cache' } });
+        
+        // Normalize even cached data to be safe
+        const rows: any[] = Array.isArray(parsed) ? parsed : (parsed?.data ?? []);
+        const normalized = rows.map((row: any) => ({
+          category:  row.category  ?? row.Category  ?? 'Unknown',
+          date:      row.date      ?? row.Date       ?? new Date().toLocaleDateString('en-IN'),
+          buyValue:  String(row.buyValue  ?? row.grossPurchase  ?? row.grossBuy  ?? row.buy  ?? '0'),
+          sellValue: String(row.sellValue ?? row.grossSale      ?? row.grossSell ?? row.sell ?? '0'),
+          netValue:  String(row.netValue  ?? row.netPurchaseSale ?? row.net      ?? '0'),
+        }));
+
+        const filtered = normalized.filter(row => 
+          row.category.toUpperCase().includes('FII') || 
+          row.category.toUpperCase().includes('DII')
+        );
+
+        return NextResponse.json(filtered.length > 0 ? filtered : normalized, { headers: { 'x-data-source': 'redis-cache' } });
       }
     } catch { console.warn('[API] Redis read failed.'); }
   }
